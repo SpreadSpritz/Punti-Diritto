@@ -54,15 +54,26 @@
 
         .card-header {
             font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
-            color: rgba(255,255,255,0.5); margin-bottom: 15px; display: flex; justify-content: space-between;
+            color: rgba(255,255,255,0.5); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+        }
+
+        /* BARRA DELLA VITA */
+        .health-bar-bg {
+            width: 100%; height: 6px; background: rgba(255,255,255,0.1);
+            border-radius: 3px; margin: 10px 0; overflow: hidden;
+        }
+        .health-bar-fill {
+            height: 100%; width: 100%; transition: width 0.5s ease, background 0.5s ease;
+            border-radius: 3px;
         }
 
         .user-row { display: flex; justify-content: space-between; align-items: center; }
         .user-info span { font-size: 19px; font-weight: 600; }
         .btn-edit-small { background: none; border: none; color: var(--blue); cursor: pointer; font-size: 16px; }
 
-        .points-display { font-size: 30px; font-weight: 800; text-align: right; min-width: 90px; }
-        .negative { color: var(--red); font-size: 15px; }
+        .points-display { font-size: 28px; font-weight: 800; text-align: right; min-width: 90px; }
+        .negative-label { color: var(--red); font-size: 15px; font-weight: 800; }
+        .not-found { color: #888; font-size: 10px; margin-top: 2px; display: block; }
 
         .controls { display: flex; gap: 10px; margin-left: 15px; }
         .controls button {
@@ -88,13 +99,25 @@
             border-radius: 12px; border: none; background: #2c2c2e; color: white; font-size: 16px;
         }
 
+        /* SLIDER STYLE */
+        .slider-box { margin: 25px 0; }
+        .slider-val { font-size: 40px; font-weight: 800; color: var(--blue); margin-bottom: 10px; display: block; }
+        input[type=range] {
+            -webkit-appearance: none; width: 100%; background: #2c2c2e; height: 10px; border-radius: 5px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: white; cursor: pointer;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
         .primary-btn {
             background: var(--blue); color: white; width: 100%; padding: 15px;
             border-radius: 14px; border: none; font-weight: 700; font-size: 16px; margin-top: 10px; cursor: pointer;
         }
 
         .secondary-btn {
-            background: none; color: var(--blue); border: none; margin-top: 15px; cursor: pointer; font-size: 14px;
+            background: var(--glass-thick); color: white; border: none; padding: 10px 15px;
+            border-radius: 12px; cursor: pointer; font-size: 13px; margin-top: 5px;
         }
 
         .delete-btn { color: var(--red); background: none; border: none; margin-top: 10px; cursor: pointer; width: 100%; }
@@ -102,8 +125,14 @@
         .add-btn-fixed {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
             background: white; color: black; padding: 16px 35px; border-radius: 40px;
-            font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: none; cursor: pointer;
+            font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: none; cursor: pointer; z-index: 100;
         }
+
+        /* LOG LIST */
+        .log-container { text-align: left; max-height: 300px; overflow-y: auto; margin-top: 15px; }
+        .log-item { border-bottom: 1px solid var(--border); padding: 10px 0; font-size: 13px; }
+        .log-date { color: #888; font-size: 11px; }
+        .log-reason { font-style: italic; color: var(--blue); }
     </style>
 </head>
 <body>
@@ -116,7 +145,10 @@
     <div class="scroll-area" id="main-content">
         <!-- Mio Account -->
         <div id="my-card" class="glass-card" style="display:none;">
-            <div class="card-header" id="ui-my-stats">Le tue statistiche</div>
+            <div class="card-header">
+                <span id="ui-my-stats">Le tue statistiche</span>
+                <button class="secondary-btn" onclick="openLogModal()" id="ui-btn-log">Log</button>
+            </div>
             <div class="user-row">
                 <div class="user-info"><span id="my-name-display">...</span></div>
                 <div class="points-display" id="my-points">100</div>
@@ -124,7 +156,8 @@
                     <button class="btn-minus" onclick="openPointsModal('me', 'minus')">-</button>
                 </div>
             </div>
-            <button class="secondary-btn" onclick="logout()" id="ui-logout">Esci</button>
+            <div class="health-bar-bg"><div id="my-health" class="health-bar-fill"></div></div>
+            <button class="delete-btn" onclick="logout()" id="ui-logout" style="text-align: left; width: auto;">Esci</button>
         </div>
 
         <div id="others-list"></div>
@@ -140,11 +173,24 @@
             <input type="password" id="auth-pass" placeholder="Password">
             <p id="auth-error" style="color:var(--red); font-size:12px; display:none; margin: 10px 0;"></p>
             <button class="primary-btn" id="auth-submit-btn" onclick="handleAuth()">Accedi</button>
-            <button class="secondary-btn" id="auth-toggle-btn" onclick="toggleAuthMode()">Non hai un account? Registrati</button>
+            <button class="secondary-btn" id="auth-toggle-btn" onclick="toggleAuthMode()">Registrati</button>
         </div>
     </div>
 
-    <!-- MODALI AGGIUNGI / MODIFICA / PUNTI -->
+    <!-- MODALE PUNTI (CON SLIDER E MOTIVO) -->
+    <div id="modal-points" class="overlay">
+        <div class="modal">
+            <h3 id="ui-points-title">Quanti punti?</h3>
+            <div class="slider-box">
+                <span id="points-val-display" class="slider-val">1</span>
+                <input type="range" id="points-slider" min="1" max="25" value="1" oninput="document.getElementById('points-val-display').innerText = this.value">
+            </div>
+            <input type="text" id="points-reason" placeholder="Motivo (facoltativo)">
+            <button class="primary-btn" onclick="submitPointsChange()" id="ui-confirm-pts">Conferma</button>
+        </div>
+    </div>
+
+    <!-- Altri Modali -->
     <div id="modal-add" class="overlay">
         <div class="modal">
             <h3 id="ui-add-title">Aggiungi Persona</h3>
@@ -163,68 +209,63 @@
         </div>
     </div>
 
-    <div id="modal-points" class="overlay">
+    <div id="modal-log" class="overlay">
         <div class="modal">
-            <h3 id="ui-points-title">Quanti punti?</h3>
-            <input type="number" id="points-val" value="1" min="1" max="50">
-            <button class="primary-btn" onclick="submitPointsChange()" id="ui-confirm-pts">Conferma</button>
+            <h3 id="ui-log-title">Log Attività</h3>
+            <div id="log-list" class="log-container"></div>
+            <button class="primary-btn" onclick="document.getElementById('modal-log').style.display='none'">Chiudi</button>
         </div>
     </div>
 
-    <!-- SCRIPT -->
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
 
     <script>
-        // --- INSERISCI QUI I TUOI DATI FIREBASE ---
         const firebaseConfig = {
-        apiKey: "AIzaSyDiEPIuYsuH-exYrCu4Sw1OigAJ2iZb_0c",
-        authDomain: "punti-diritto.firebaseapp.com",
-        databaseURL: "https://punti-diritto-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "punti-diritto",
-        storageBucket: "punti-diritto.firebasestorage.app",
-        messagingSenderId: "718743082670",
-        appId: "1:718743082670:web:d8c182b4ac46b5b8783f3f",
-        measurementId: "G-VWCMYL16ZJ"
-      };
+            apiKey: "AIzaSyDiEPIuYsuH-exYrCu4Sw1OigAJ2iZb_0c",
+            authDomain: "punti-diritto.firebaseapp.com",
+            databaseURL: "https://punti-diritto-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "punti-diritto",
+            storageBucket: "punti-diritto.firebasestorage.app",
+            messagingSenderId: "718743082670",
+            appId: "1:718743082670:web:d8c182b4ac46b5b8783f3f",
+            measurementId: "G-VWCMYL16ZJ"
+        };
 
-        // Inizializzazione protetta
-        let db;
-        try {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.database();
-        } catch (e) {
-            alert("Errore configurazione Firebase: " + e.message);
-        }
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
         let lang = localStorage.getItem('rp_lang') || 'it';
         let myAcc = localStorage.getItem('rp_myacc');
         let friends = JSON.parse(localStorage.getItem('rp_friends') || '[]');
         let isSignup = false;
         let activeTarget, activeType, editingAcc;
+        let myCurrentPoints = 100;
 
         const translations = {
             it: {
                 appTitle: "Punti Diritto", myStats: "Le tue statistiche", addBtn: "+ Aggiungi Persona",
-                neg: "In Negativo", login: "Accedi", signup: "Registrati",
+                neg: "IN NEGATIVO", login: "Accedi", signup: "Registrati",
                 userPlaceholder: "Nome utente", passPlaceholder: "Password",
                 toggleToSignup: "Non hai un account? Registrati", toggleToLogin: "Hai già un account? Accedi",
                 errorExists: "Nome già occupato!", errorWrong: "Nome o password errati!",
-                errorDb: "Errore Database! Controlla le regole su Firebase.",
                 addT: "Aggiungi Persona", editT: "Modifica Persona", ptsT: "Quanti punti?",
                 accExact: "Nome account esatto", dispPlaceholder: "Nome visualizzato",
-                save: "Salva", confirm: "Conferma", remove: "Rimuovi dalla lista", logout: "Esci"
+                save: "Salva", confirm: "Conferma", remove: "Rimuovi dalla lista", logout: "Esci",
+                reasonPlaceholder: "Motivo (facoltativo)", logTitle: "Log Attività",
+                notExist: "(Account non ancora creato)", blockNeg: "Non puoi modificare gli altri se sei in negativo!"
             },
             en: {
                 appTitle: "Right Points", myStats: "Your Stats", addBtn: "+ Add Person",
-                neg: "In Negative", login: "Login", signup: "Sign Up",
+                neg: "IN NEGATIVE", login: "Login", signup: "Sign Up",
                 userPlaceholder: "Username", passPlaceholder: "Password",
                 toggleToSignup: "No account? Sign up", toggleToLogin: "Have an account? Login",
                 errorExists: "Name already taken!", errorWrong: "Wrong name or password!",
-                errorDb: "Database Error! Check Firebase Rules.",
                 addT: "Add Person", editT: "Edit Person", ptsT: "How many points?",
                 accExact: "Exact account name", dispPlaceholder: "Display name",
-                save: "Save", confirm: "Confirm", remove: "Remove from list", logout: "Logout"
+                save: "Save", confirm: "Confirm", remove: "Remove from list", logout: "Logout",
+                reasonPlaceholder: "Reason (optional)", logTitle: "Activity Log",
+                notExist: "(Account not created yet)", blockNeg: "You can't modify others while in negative!"
             }
         };
 
@@ -236,14 +277,12 @@
             document.getElementById('auth-title').innerText = isSignup ? t.signup : t.login;
             document.getElementById('auth-submit-btn').innerText = isSignup ? t.signup : t.login;
             document.getElementById('auth-toggle-btn').innerText = isSignup ? t.toggleToLogin : t.toggleToSignup;
-            
-            // Placeholder dinamici
             document.getElementById('auth-user').placeholder = t.userPlaceholder;
             document.getElementById('auth-pass').placeholder = t.passPlaceholder;
             document.getElementById('add-acc-input').placeholder = t.accExact;
             document.getElementById('add-disp-input').placeholder = t.dispPlaceholder;
             document.getElementById('edit-disp-input').placeholder = t.dispPlaceholder;
-
+            document.getElementById('points-reason').placeholder = t.reasonPlaceholder;
             document.getElementById('ui-add-title').innerText = t.addT;
             document.getElementById('ui-save-add').innerText = t.save;
             document.getElementById('ui-edit-title').innerText = t.editT;
@@ -252,6 +291,7 @@
             document.getElementById('ui-points-title').innerText = t.ptsT;
             document.getElementById('ui-confirm-pts').innerText = t.confirm;
             document.getElementById('ui-logout').innerText = t.logout;
+            document.getElementById('ui-log-title').innerText = t.logTitle;
             renderFriends();
         }
 
@@ -263,45 +303,28 @@
 
         function toggleAuthMode() {
             isSignup = !isSignup;
-            document.getElementById('auth-error').style.display = 'none';
             updateUI();
         }
 
         async function handleAuth() {
             const user = document.getElementById('auth-user').value.trim().toLowerCase();
             const pass = document.getElementById('auth-pass').value.trim();
-            const errEl = document.getElementById('auth-error');
-            
             if (!user || !pass) return;
-            errEl.style.display = 'none';
 
-            try {
-                const snap = await db.ref('users/' + user).once('value');
-                
-                if (isSignup) {
-                    if (snap.exists()) {
-                        errEl.innerText = translations[lang].errorExists;
-                        errEl.style.display = 'block';
-                    } else {
-                        await db.ref('users/' + user).set({
-                            pass: pass,
-                            points: 100,
-                            lastReset: new Date().toDateString()
-                        });
-                        loginSuccess(user);
-                    }
+            const snap = await db.ref('users/' + user).once('value');
+            if (isSignup) {
+                if (snap.exists()) {
+                    alert(translations[lang].errorExists);
                 } else {
-                    if (snap.exists() && snap.val().pass === pass) {
-                        loginSuccess(user);
-                    } else {
-                        errEl.innerText = translations[lang].errorWrong;
-                        errEl.style.display = 'block';
-                    }
+                    await db.ref('users/' + user).set({ pass, points: 100, lastReset: new Date().toDateString() });
+                    loginSuccess(user);
                 }
-            } catch (e) {
-                console.error(e);
-                errEl.innerText = translations[lang].errorDb;
-                errEl.style.display = 'block';
+            } else {
+                if (snap.exists() && snap.val().pass === pass) {
+                    loginSuccess(user);
+                } else {
+                    alert(translations[lang].errorWrong);
+                }
             }
         }
 
@@ -331,30 +354,45 @@
             db.ref('users/' + myAcc).on('value', snap => {
                 const data = snap.val();
                 if (data) {
-                    const today = new Date().toDateString();
-                    if (data.lastReset !== today) {
-                        db.ref('users/' + myAcc).update({
-                            points: data.points < 0 ? 75 : 100,
-                            lastReset: today
-                        });
-                    }
-                    displayPoints('my-points', data.points);
+                    myCurrentPoints = data.points;
+                    checkReset(data);
+                    updateUserView('my-points', 'my-health', data.points);
                 }
             });
             updateUI();
         }
 
-        function displayPoints(id, val) {
-            const el = document.getElementById(id);
-            if (!el) return;
-            if (val < 0) {
-                el.innerText = translations[lang].neg;
-                el.className = "points-display negative";
-            } else {
-                el.innerText = val;
-                el.className = "points-display";
+        function checkReset(data) {
+            const today = new Date().toDateString();
+            if (data.lastReset !== today) {
+                db.ref('users/' + myAcc).update({
+                    points: data.points < 0 ? 75 : 100,
+                    lastReset: today
+                });
             }
         }
+
+        function updateUserView(ptsId, healthId, val, statusId = null) {
+            const ptsEl = document.getElementById(ptsId);
+            const healthEl = document.getElementById(healthId);
+            
+            if (val < 0) {
+                ptsEl.innerText = translations[lang].neg;
+                ptsEl.className = "points-display negative-label";
+                healthEl.style.width = "0%";
+            } else {
+                ptsEl.innerText = val;
+                ptsEl.className = "points-display";
+                healthEl.style.width = val + "%";
+                // Colore barra
+                if (val > 60) healthEl.style.background = varColor('--green');
+                else if (val > 25) healthEl.style.background = "#ffcc00";
+                else healthEl.style.background = varColor('--red');
+            }
+            if (statusId) document.getElementById(statusId).style.display = 'none';
+        }
+
+        function varColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name); }
 
         function renderFriends() {
             const list = document.getElementById('others-list');
@@ -363,34 +401,111 @@
                 const card = document.createElement('div');
                 card.className = 'glass-card';
                 card.innerHTML = `
-                    <div class="card-header">Account: @${f.acc} <button class="btn-edit-small" onclick="openEditModal('${f.acc}', '${f.disp}')">✏️</button></div>
+                    <div class="card-header">
+                        <span>Account: @${f.acc}</span>
+                        <button class="btn-edit-small" onclick="openEditModal('${f.acc}', '${f.disp}')">✏️</button>
+                    </div>
                     <div class="user-row">
-                        <div class="user-info"><span>${f.disp}</span></div>
+                        <div class="user-info">
+                            <span>${f.disp}</span>
+                            <small id="status-${f.acc}" class="not-found">${translations[lang].notExist}</small>
+                        </div>
                         <div class="points-display" id="pts-${f.acc}">...</div>
                         <div class="controls">
                             <button class="btn-minus" onclick="openPointsModal('${f.acc}', 'minus')">-</button>
                             <button class="btn-plus" onclick="openPointsModal('${f.acc}', 'plus')">+</button>
                         </div>
-                    </div>`;
+                    </div>
+                    <div class="health-bar-bg"><div id="health-${f.acc}" class="health-bar-fill"></div></div>`;
                 list.appendChild(card);
                 db.ref('users/' + f.acc).on('value', snap => {
-                    if (snap.exists()) displayPoints('pts-' + f.acc, snap.val().points);
+                    if (snap.exists()) {
+                        updateUserView('pts-' + f.acc, 'health-' + f.acc, snap.val().points, 'status-' + f.acc);
+                    }
                 });
             });
         }
 
-        function openAddModal() { document.getElementById('modal-add').style.display = 'flex'; }
-        function addNewFriend() {
-            const acc = document.getElementById('add-acc-input').value.trim().toLowerCase();
-            const disp = document.getElementById('add-disp-input').value.trim();
-            if (acc && acc !== myAcc && !friends.find(f => f.acc === acc)) {
-                friends.push({ acc, disp: disp || acc });
-                localStorage.setItem('rp_friends', JSON.stringify(friends));
-                renderFriends();
+        // --- PUNTI ---
+        async function openPointsModal(target, type) {
+            if (target !== 'me' && myCurrentPoints < 0) {
+                alert(translations[lang].blockNeg);
+                return;
             }
-            document.getElementById('modal-add').style.display = 'none';
+            activeTarget = target;
+            activeType = type;
+            document.getElementById('points-slider').value = 1;
+            document.getElementById('points-val-display').innerText = 1;
+            document.getElementById('points-reason').value = "";
+            document.getElementById('modal-points').style.display = 'flex';
         }
 
+        async function submitPointsChange() {
+            const amount = parseInt(document.getElementById('points-slider').value);
+            const reason = document.getElementById('points-reason').value.trim();
+            const targetId = activeTarget === 'me' ? myAcc : activeTarget;
+            
+            const snap = await db.ref('users/' + targetId).once('value');
+            let p = snap.exists() ? snap.val().points : 100; // Se non esiste, parte da 100
+
+            if (activeType === 'minus') {
+                p = (p - amount) < 0 ? -1 : (p - amount);
+            } else {
+                p = Math.min(100, p + amount);
+            }
+
+            // Aggiorna o crea utente "fantasma"
+            const updateObj = { points: p };
+            if (!snap.exists()) updateObj.lastReset = new Date().toDateString();
+            await db.ref('users/' + targetId).update(updateObj);
+
+            // Salva Log
+            const logEntry = {
+                from: myAcc,
+                to: targetId,
+                amount: (activeType === 'minus' ? -amount : +amount),
+                reason: reason,
+                date: new Date().toLocaleString(lang === 'it' ? 'it-IT' : 'en-US')
+            };
+            db.ref('logs/' + targetId).push(logEntry);
+            if (targetId !== myAcc) db.ref('logs/' + myAcc).push(logEntry);
+
+            document.getElementById('modal-points').style.display = 'none';
+        }
+
+        // --- LOG ---
+        async function openLogModal() {
+            const listEl = document.getElementById('log-list');
+            listEl.innerHTML = "Loading...";
+            document.getElementById('modal-log').style.display = 'flex';
+
+            const snap = await db.ref('logs/' + myAcc).limitToLast(20).once('value');
+            listEl.innerHTML = "";
+            if (!snap.exists()) {
+                listEl.innerHTML = "No logs found.";
+                return;
+            }
+
+            const logs = [];
+            snap.forEach(child => { logs.unshift(child.val()); });
+
+            logs.forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'log-item';
+                const sign = log.amount > 0 ? "+" : "";
+                const direction = log.to === myAcc ? "<-" : "->";
+                const peer = log.to === myAcc ? log.from : log.to;
+                
+                item.innerHTML = `
+                    <div class="log-date">${log.date}</div>
+                    <div><b>${sign}${log.amount}</b> ${direction} @${peer}</div>
+                    ${log.reason ? `<div class="log-reason">"${log.reason}"</div>` : ''}
+                `;
+                listEl.appendChild(item);
+            });
+        }
+
+        // --- MODIFICA PERSONA ---
         function openEditModal(acc, disp) {
             editingAcc = acc;
             document.getElementById('edit-disp-input').value = disp;
@@ -409,24 +524,16 @@
             renderFriends();
             document.getElementById('modal-edit').style.display = 'none';
         }
-
-        function openPointsModal(target, type) {
-            activeTarget = target; activeType = type;
-            document.getElementById('modal-points').style.display = 'flex';
-        }
-        async function submitPointsChange() {
-            const amount = parseInt(document.getElementById('points-val').value);
-            if (isNaN(amount) || amount < 1 || amount > 50) return;
-            const targetId = activeTarget === 'me' ? myAcc : activeTarget;
-            try {
-                const snap = await db.ref('users/' + targetId).once('value');
-                if (snap.exists()) {
-                    let p = snap.val().points;
-                    p = activeType === 'minus' ? (p - amount < 0 ? -1 : p - amount) : Math.min(100, p + amount);
-                    await db.ref('users/' + targetId).update({ points: p });
-                }
-            } catch(e) { alert(translations[lang].errorDb); }
-            document.getElementById('modal-points').style.display = 'none';
+        function openAddModal() { document.getElementById('modal-add').style.display = 'flex'; }
+        function addNewFriend() {
+            const acc = document.getElementById('add-acc-input').value.trim().toLowerCase();
+            const disp = document.getElementById('add-disp-input').value.trim();
+            if (acc && acc !== myAcc && !friends.find(f => f.acc === acc)) {
+                friends.push({ acc, disp: disp || acc });
+                localStorage.setItem('rp_friends', JSON.stringify(friends));
+                renderFriends();
+            }
+            document.getElementById('modal-add').style.display = 'none';
         }
 
         window.onclick = e => { if (e.target.className === 'overlay') e.target.style.display = 'none'; }
